@@ -62,9 +62,9 @@ def similaritySearch(num, seedNodes, M):
 # Run the program
 def run():
 	print "Loading files..."
-	featuresVectorFile = open('Extracted_features.csv', 'r');
-	seedFile = open('Seed.csv', 'r');
-	graphFile = open('Graph.csv', 'r');
+	featuresVectorFile = open('../Extracted_features.csv', 'r');
+	seedFile = open('../Seed.csv', 'r');
+	graphFile = open('../Graph.csv', 'r');
 	print 'Done loading files'
 
 	M = createAdjacencyMatrix(graphFile);
