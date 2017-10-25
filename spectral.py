@@ -38,7 +38,7 @@ def numpyMatrix(graphFile):
 	
 # 	print "Finding the smallest K eigenvectors"
 # 	np_vectors = np.array(vr[:K])
-#	np_vectors = np_vectors.T
+# 	np_vectors = np_vectors.T
 # 	print "Done finding the smallest K eigenvectors"
 
 # 	print "Performing K-Means Clustering"
@@ -50,7 +50,14 @@ def numpyMatrix(graphFile):
 # 	print "Done performing K-Means Clustering"
 
 
-
+def seedDict(seedFile):
+	print "Filling in dictionary..."
+	seed = {}
+	for line in seedFile:
+		(node1, node2) = [int(x) for x in line.split(',')]
+		seed[node1] = node2
+	print "Done filling in dictionary"
+	return seed
 
 # Run the program
 def run():
@@ -60,20 +67,26 @@ def run():
 	graphFile = open('../Graph.csv', 'r')
 	print 'Done loading files'
 
+	np.set_printoptions(threshold=np.nan)
 	M = numpyMatrix(graphFile)
+	seed = seedDict(seedFile)
+
 
 	# spectralClustering(M, 1000)
-	np.set_printoptions(threshold=np.nan)
-	features = np.genfromtxt('Extracted_features.csv', delimiter = ',', dtype='int32')
-	spectral = cluster.SpectralClustering(n_clusters = 10, eigen_solver = 'arpack', affinity = "nearest_neighbors")
-	spectral.fit(features[6001:,])
-	y_pred = spectral.labels_.astype(np.int)
+	# features = np.genfromtxt('Extracted_features.csv', delimiter = ',', dtype='int32')
+	# spectral = cluster.SpectralClustering(n_clusters = 10, eigen_solver = 'arpack', affinity = "nearest_neighbors")
+	# spectral.fit(features[6001:,])
+	# y_pred = spectral.labels_.astype(np.int)
 
 
 	similarityMatrix = cluster.SpectralClustering(n_clusters = 10, eigen_solver = 'arpack', affinity = "precomputed")
 	similarityMatrix.fit(M)
 	y_labels = similarityMatrix.labels_.astype(np.int)
-	print y_labels
 
+	test = {}
+	for (node, digit) in seed.items():
+		test[node] = (y_labels[node-1], digit)
+
+	print "test", test.items()
 
 run()
