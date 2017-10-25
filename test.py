@@ -104,21 +104,37 @@ def run():
 
 	# print norm
 
+	record = {}
+
 	print "Performing K-Means Clustering"
 	vectors = features[:,:]
 
 	kmeans = cluster.KMeans(n_clusters=10).fit(vectors)
-	print kmeans.labels_
-	
-	# submission = np.zeros((4000,2))
-	# for i in range(submission.shape[0]):
-	# 	submission[i,0] = i+6001
-	# 	submission[i,1] = kmeans.labels_[i]
+
+	for i in range(seedMatrix.shape[0]):
+		node = seedMatrix[i,0]
+		digit = seedMatrix[i,1]
+		record[node] = (kmeans.labels_[node-1], digit)
+
+	digitMapping = {}
+	digitMapping[kmeans.labels_[17]] = 0
+	digitMapping[kmeans.labels_[1]] = 1
+	digitMapping[kmeans.labels_[11]] = 2
+	digitMapping[kmeans.labels_[14]] = 3
+	digitMapping[kmeans.labels_[5]] = 4
+	digitMapping[kmeans.labels_[32]] = 5
+	digitMapping[kmeans.labels_[10]] = 6
+	digitMapping[kmeans.labels_[63]] = 7
+	digitMapping[kmeans.labels_[44]] = 8
+	digitMapping[kmeans.labels_[20]] = 9
+
+	submission = np.zeros((4000,2))
+	for i in range(submission.shape[0]):
+		submission[i,0] = i+6001
+		submission[i,1] = digitMapping.get(kmeans.labels_[i+6000])
 
 
-
-
-	# np.savetxt("attempt.csv", submission, fmt='%i', delimiter=",", header="Id,Label", comments='')
+	np.savetxt("attempt.csv", submission.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 	
 	print "Done performing K-Means Clustering"
 
