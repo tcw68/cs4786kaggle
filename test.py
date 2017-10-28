@@ -3,7 +3,7 @@ from scipy import linalg as LA
 from scipy.cluster.vq import kmeans, vq
 from collections import deque
 import math
-from sklearn import cluster
+from sklearn import cluster, mixture, svm
 
 # def findWeightedMatrix(graphFile, features):
 # 	print "Creating numpy adjacency matrix..."
@@ -106,37 +106,103 @@ def run():
 
 	record = {}
 
-	print "Performing K-Means Clustering"
-	vectors = features[:,:]
+	# print "Performing K-Means Clustering"
+	# vectors = features[:,:]
 
-	kmeans = cluster.KMeans(n_clusters=10).fit(vectors)
+	# kmeans = cluster.KMeans(n_clusters=10).fit(vectors)
 
+	# for i in range(seedMatrix.shape[0]):
+	# 	node = seedMatrix[i,0]
+	# 	digit = seedMatrix[i,1]
+	# 	record[node] = (kmeans.labels_[node-1], digit)
+
+	# digitMapping = {}
+	# digitMapping[kmeans.labels_[17]] = 0
+	# digitMapping[kmeans.labels_[1]] = 1
+	# digitMapping[kmeans.labels_[11]] = 2
+	# digitMapping[kmeans.labels_[14]] = 3
+	# digitMapping[kmeans.labels_[5]] = 4
+	# digitMapping[kmeans.labels_[32]] = 5
+	# digitMapping[kmeans.labels_[10]] = 6
+	# digitMapping[kmeans.labels_[63]] = 7
+	# digitMapping[kmeans.labels_[44]] = 8
+	# digitMapping[kmeans.labels_[20]] = 9
+
+	# submission = np.zeros((4000,2))
+	# for i in range(submission.shape[0]):
+	# 	submission[i,0] = i+6001
+	# 	submission[i,1] = digitMapping.get(kmeans.labels_[i+6000])
+
+
+	# np.savetxt("attempt.csv", submission.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	
+	# print "Done performing K-Means Clustering"
+
+	# test = np.zeros((60,1084))
+	# for i in range(seedMatrix.shape[0]):
+	# 	node = seedMatrix[i,0]
+	# 	test[i] = features[node-1]
+
+	# print "Performing EM GMM"
+
+	# GMM = mixture.GaussianMixture(n_components=10)
+	# print "fitting"
+	# GMM.fit(test)
+	# print "done fitting"
+	# print "predicting"
+	# y_labels = GMM.predict(test)
+	# print y_labels
+	# print "done predicting"
+	# print "Done performing EM GMM"
+
+	# quit()
+	# record = {}
+
+	# for i in range(seedMatrix.shape[0]):
+	# 	node = seedMatrix[i,0]
+	# 	digit = seedMatrix[i,1]
+	# 	record[node] = (y_labels[node-1], digit)
+
+	# for k, v in record.items():
+	# 	print (k, v)
+
+	# print "Performing SVM"
+
+	test = np.zeros((60,1084))
 	for i in range(seedMatrix.shape[0]):
 		node = seedMatrix[i,0]
-		digit = seedMatrix[i,1]
-		record[node] = (kmeans.labels_[node-1], digit)
+		test[i] = features[node-1]
 
-	digitMapping = {}
-	digitMapping[kmeans.labels_[17]] = 0
-	digitMapping[kmeans.labels_[1]] = 1
-	digitMapping[kmeans.labels_[11]] = 2
-	digitMapping[kmeans.labels_[14]] = 3
-	digitMapping[kmeans.labels_[5]] = 4
-	digitMapping[kmeans.labels_[32]] = 5
-	digitMapping[kmeans.labels_[10]] = 6
-	digitMapping[kmeans.labels_[63]] = 7
-	digitMapping[kmeans.labels_[44]] = 8
-	digitMapping[kmeans.labels_[20]] = 9
+
+	SVM = svm.SVC()
+	print "fitting"
+	SVM.fit(test, [7,1,5,2,1,4,4,5,2,8,6,2,5,8,3,4,6,0,1,8,7,3,8,2,3,9,6,7,9,7,4,5,5,2,6,1,3,6,9,3,3,6,8,5,0,1,0,9,2,7,9,7,0,8,0,0,4,9,1,4])
+	print "done fitting"
+	print "predicting"
+	y_labels = SVM.predict(features)
+	print "done predicting"
+	print "Done performing EM GMM"
 
 	submission = np.zeros((4000,2))
 	for i in range(submission.shape[0]):
-		submission[i,0] = i+6001
-		submission[i,1] = digitMapping.get(kmeans.labels_[i+6000])
+	 	submission[i,0] = i+6001
+	 	submission[i,1] = y_labels[i+6000]
 
+	np.savetxt("svm_attempt.csv", submission.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-	np.savetxt("attempt.csv", submission.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
-	
-	print "Done performing K-Means Clustering"
+	# record = {}
+
+	# for i in range(seedMatrix.shape[0]):
+	# 	node = seedMatrix[i,0]
+	# 	digit = seedMatrix[i,1]
+	# 	record[node] = digit
+
+	# for k, v in record.items():
+	# 	print (k, v)
+	# 	record[node] = (y_labels[node-1], digit)
+
+	# for k, v in record.items():
+	# 	print (k, v)
 
 	# spectralClustering(M, 1000)
 	# features = np.genfromtxt('Extracted_features.csv', delimiter = ',', dtype='int32')
