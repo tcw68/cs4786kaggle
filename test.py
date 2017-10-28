@@ -70,11 +70,11 @@ def run():
 	# print 'Done loading files'
 
 	print "Creating features matrix"
-	features = np.genfromtxt('Extracted_features.csv', delimiter = ',')
+	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 	print "Done creating features matrix"
 
 	print "Creating seed matrix"
-	seedMatrix = np.genfromtxt('Seed.csv', delimiter = ',', dtype='int32')
+	seedMatrix = np.genfromtxt('../Seed.csv', delimiter = ',', dtype='int32')
 	print "Done creating seed matrix"
 
 	np.set_printoptions(threshold=np.nan)
@@ -175,12 +175,9 @@ def run():
 		test[i] = features[node-1]
 		labels[i] = seedMatrix[i,1]
 
-	print labels
-
-
 	SVM = svm.SVC()
 	print "fitting"
-	SVM.fit(test, [7,1,5,2,1,4,4,5,2,8,6,2,5,8,3,4,6,0,1,8,7,3,8,2,3,9,6,7,9,7,4,5,5,2,6,1,3,6,9,3,3,6,8,5,0,1,0,9,2,7,9,7,0,8,0,0,4,9,1,4])
+	SVM.fit(test, labels.T)
 	print "done fitting"
 	print "predicting"
 	y_labels = SVM.predict(features)
