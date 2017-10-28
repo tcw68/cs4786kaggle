@@ -169,9 +169,13 @@ def run():
 	# print "Performing SVM"
 
 	test = np.zeros((60,1084))
+	labels = np.zeros((60,1))
 	for i in range(seedMatrix.shape[0]):
 		node = seedMatrix[i,0]
 		test[i] = features[node-1]
+		labels[i] = seedMatrix[i,1]
+
+	print labels
 
 
 	SVM = svm.SVC()
