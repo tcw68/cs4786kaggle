@@ -446,7 +446,8 @@ def run():
 	- You should be able to submit the csv made in run_svm to Kaggle directly
 	"""
 	# Load in 6000 x 6000 edges matrix of 0 and 1
-	M = loadWeightedAdjacencyMatrix('adjacency_matrix.csv')
+	# M = loadWeightedAdjacencyMatrix('adjacency_matrix.csv')
+	M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')
 
 	# # Do spectral embedding
 	# print "Performing spectral embedding..."
@@ -455,14 +456,11 @@ def run():
 	# print "Done performing spectral embedding"
 
 	# # Do clustering to get 10 clusters
-	# runAgglomerativeClustering(X_se)
-
-
+	# predictedLabels = runAgglomerativeClustering(X_se)
 
 	predictedLabels = runSpectralClustering(M)
-	clusterAssignments = getClusterAssignments(predictedLabels)
 
-	# clusterAssignments = load_clusters()
+	clusterAssignments = getClusterAssignments(predictedLabels)
 	getOptimalClusterLabelling(clusterAssignments)
 	validateClusters(clusterAssignments)
 	
