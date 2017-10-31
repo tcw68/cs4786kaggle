@@ -2,10 +2,9 @@ import numpy as np
 from sklearn.cluster import SpectralClustering, KMeans
 import matplotlib.pyplot as plt
 import networkx as nx
-from sklearn_extensions.fuzzy_kmeans import KMedians, FuzzyKMeans, KMeans
 from sklearn import neighbors
 from scipy.sparse import csgraph
-from itertools import combinations
+from itertools import combinations, permutations
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy import spatial
 from sklearn import datasets
@@ -14,7 +13,7 @@ from sklearn import svm
 from sklearn import (manifold, datasets, decomposition, ensemble,
                      discriminant_analysis, random_projection)
 from time import time
-from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import AgglomerativeClustering, KMeans
 
 # Create distance matrix using updated matrix
 # 0 = identical, larger number = greater dissimilarity, infinity = not similar at all
@@ -126,6 +125,18 @@ def loadUnweightedAdjacencyMatrix(fileName):
 
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(int)
+
+def loadWeightedAdjacencyMatrix(fileName):
+	with open(fileName, 'r') as f:
+		print "Loading unweighted adjacency matrix..."
+
+		M = np.zeros((6000,6000))
+		lines = f.readlines()
+		for i, line in enumerate(lines):
+			M[i,:] = [float(e) for e in line.split(',')]
+
+		print "Done loading unweighted adjacency matrix"
+		return M.astype(float)
 		
 def getLabelsDict(): 
 	with open('../Seed.csv', 'r') as f:
@@ -331,6 +342,81 @@ def run_svm(train_set, test_set, train_labels):
 
 	np.savetxt("se_ac_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
+# Do spectral clustering to get 10 clusters
+def runSpectralClustering(M):
+	delta = np.std(M)
+	M = np.exp(- M ** 2 / (2. * delta ** 2))
+
+	print "Performing spectral clustering..."
+	spectral = SpectralClustering(n_clusters=10, eigen_solver='arpack', affinity='precomputed')
+	predicted_labels = spectral.fit_predict(M) # 1 x 6000
+	print "Done performing spectral clustering"
+
+	return predicted_labels
+
+# Do agglomerative clustering to get 10 clusters
+def runAgglomerativeClustering(X, linkage='ward'):
+	print "Performing agglomerative clustering..."
+	clustering = AgglomerativeClustering(linkage=linkage, n_clusters=10)
+	predicted_labels = clustering.fit_predict(X)
+	print "Done performing agglomerative clustering"
+
+	return predicted_labels
+
+# Do K-means clustering to get 10 clusters
+def runKMeansClustering(M):
+	print "Performing KMeans clustering..."
+	kmeans = KMeans(n_clusters=10)
+	predicted_labels = kmeans.fit_predict(M)
+	print "Done performing KMeans clustering"
+
+	return predicted_labels
+
+# Brute force 10! to find labelling that maximizes seed accuracy
+def getOptimalClusterLabelling(clusterAssignments):
+	print "Looking for optimal cluster labelling..."
+	clusters = clusterAssignments.keys()
+	digits = [i for i in range(10)]
+	perms = list(permutations(digits)) # 10! possibilities
+
+	labels = getLabelsDict()
+
+	maxAccuracy = 0.0
+	maxPerm = []
+	for i, perm in enumerate(perms):
+		numCorrectLabels = 0.0
+		mapping = zip(clusters, perm) # cluster_no, digit
+		for (cluster_no, digit) in mapping:
+			clusterNodes = clusterAssignments[cluster_no]
+			labelledNodes = labels[digit]
+			overlap = clusterNodes.intersection(labelledNodes)
+			numCorrectLabels += len(overlap)
+		accuracy = numCorrectLabels / float(60)
+		if accuracy > maxAccuracy:
+			maxAccuracy = accuracy
+			maxPerm = perm
+	print "Found optimal cluster labelling"
+	print "Max accuracy: %f" % maxAccuracy
+
+	print "Optimal digit-cluster mapping"
+	clusterMapping = zip(maxPerm, clusters)
+	sortedMapping = sorted(clusterMapping, key=lambda x: x[0])
+	for (digit, cluster) in sortedMapping:
+		print digit, ':', cluster
+
+def getClusterAssignments(predictedLabels):
+	# labelledDict stores the cluster -> nodes in cluster
+	labelledDict = {}
+	for idx, label in enumerate(predictedLabels):
+		node = idx + 1
+		labelledDict.setdefault(label, set()).add(node)
+
+	# Print out number of nodes in each cluster
+	for cluster, nodes in labelledDict.items():
+		print 'Cluster %i: %i' % (cluster, len(nodes))
+
+	return labelledDict
+
 def run():
 	"""
 	TRY THIS:
@@ -360,36 +446,29 @@ def run():
 	- You should be able to submit the csv made in run_svm to Kaggle directly
 	"""
 	# Load in 6000 x 6000 edges matrix of 0 and 1
-	M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')
+	M = loadWeightedAdjacencyMatrix('adjacency_matrix.csv')
 
-	# Do spectral embedding
-	print "Performing spectral embedding..."
-	embedder = manifold.SpectralEmbedding(n_components=1084, affinity='precomputed')
-	X_se = embedder.fit_transform(M)
-	print "Done performing spectral embedding"
-	print X_se.shape
+	# # Do spectral embedding
+	# print "Performing spectral embedding..."
+	# embedder = manifold.SpectralEmbedding(n_components=1084, affinity='precomputed')
+	# X_se = embedder.fit_transform(M)
+	# print "Done performing spectral embedding"
 
-	# Do clustering to get 10 clusters
-	print "Performing agglomerative clustering..."
-	clustering = AgglomerativeClustering(linkage='ward', n_clusters=10)
-	predicted_labels = clustering.fit_predict(X_se)
-	print "Done performing agglomerative clustering"
-
-	# labelledDict stores the cluster -> nodes in cluster
-	labelledDict = {}
-	for idx, label in enumerate(predicted_labels):
-		node = idx + 1
-		labelledDict.setdefault(label, set()).add(node)
-
-	# Print out number of nodes in each cluster
-	for cluster, nodes in labelledDict.items():
-		print 'Cluster %i: %i' % (cluster, len(nodes))
-
-	# TODO: Brute force 10! to find labelling that maximizes seed accuracy
+	# # Do clustering to get 10 clusters
+	# runAgglomerativeClustering(X_se)
 
 
-	validateClusters(labelledDict)
 
+	predictedLabels = runSpectralClustering(M)
+	clusterAssignments = getClusterAssignments(predictedLabels)
+
+	# clusterAssignments = load_clusters()
+	getOptimalClusterLabelling(clusterAssignments)
+	validateClusters(clusterAssignments)
+	
+
+	
+	# # Run SVM
 	# features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 	# train_set, test_set = features[:6000], features[6000:]
 	# run_svm(train_set, test_set, train_labels)
@@ -513,9 +592,9 @@ def checkLabelledNodes():
 				if node in nodes:
 					labelledClusters.setdefault(digit, []).append(clusterIdx)
 
-	print "Clusters dict"
+	print "Digit | Clusters"
 	for num, clusters in labelledClusters.items():
-		print num, ': ', clusters 
+		print num, '  :  ', clusters 
 
 
 if __name__ == '__main__':
