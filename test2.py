@@ -67,25 +67,48 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 # 	print "Done creating weighted adjacency matrix"
 # 	return WM
 
-def findWeightedMatrix(M):
+# def findWeightedMatrix(M):
+# 	print "Creating features matrix..."
+# 	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
+# 	print "Done creating features matrix"
+
+# 	print "Creating numpy adjacency matrix..."
+# 	WM = np.full((6000,6000), float(100))
+
+# 	print "Filling in matrix..."
+# 	for i in range(M.shape[0]):
+# 		for j in range(M.shape[1]):
+# 			if i == j:
+# 				WM[i,j] = 0
+# 			if M[i,j] == 0: 
+# 				continue
+# 			else:
+# 				euclidean_distance = np.linalg.norm(features[i] - features[j])
+# 				WM[i,j] = euclidean_distance
+# 				WM[j,i] = euclidean_distance
+
+# 	print "Done creating matrix"
+# 	return WM
+
+def getWeightedMatrix(M):
 	print "Creating features matrix..."
 	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 	print "Done creating features matrix"
 
 	print "Creating numpy adjacency matrix..."
-	WM = np.full((6000,6000), float(100))
+	WM = np.zeros((6000,6000))
 
 	print "Filling in matrix..."
 	for i in range(M.shape[0]):
 		for j in range(M.shape[1]):
 			if i == j:
-				WM[i,j] = 0
+				WM[i,j] = 1
 			if M[i,j] == 0: 
 				continue
 			else:
 				euclidean_distance = np.linalg.norm(features[i] - features[j])
-				WM[i,j] = euclidean_distance
-				WM[j,i] = euclidean_distance
+				WM[i,j] = 1.0 / euclidean_distance
+				WM[j,i] = 1.0 / euclidean_distance
 
 	print "Done creating matrix"
 	return WM
@@ -197,8 +220,8 @@ def updateUnweightedAdjacencyMatrix(M, labels):
 
 	for (i, j) in allCombos:
 		if (i, j) in connectedNodes or (j, i) in connectedNodes:
-			M[i-1, j-1] = 2
-			M[j-1, i-1] = 2
+			M[i-1, j-1] = 1
+			M[j-1, i-1] = 1
 		else:
 			M[i-1, j-1] = 0
 			M[j-1, i-1] = 0
@@ -273,11 +296,11 @@ def runLabelPropagationSVM():
 	y_train = np.array(y_train)
 	unlabeled_set = np.array(unlabeled_set)
 
-	print "Start propogating labels..."
+	print "Start propagating labels..."
 	lp_model = label_propagation.LabelSpreading(gamma=0.25, max_iter=5)
 	lp_model.fit(features[:6000], y_train)
 	predicted_labels = lp_model.transduction_[unlabeled_set]
-	print "Done propogating labels"
+	print "Done propagating labels"
 
 	for idx, label in zip(unlabeled_set, predicted_labels):
 		labels[label].add(idx+1)
@@ -340,15 +363,15 @@ def run_svm(train_set, test_set, train_labels):
 			output[node-6001,0] = node
 			output[node-6001,1] = digit
 
-	np.savetxt("se_ac_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	np.savetxt("spectral_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
 # Do spectral clustering to get 10 clusters
 def runSpectralClustering(M):
-	delta = np.std(M)
-	M = np.exp(- M ** 2 / (2. * delta ** 2))
+	# delta = np.std(M)
+	# M = np.exp(- M ** 2 / (2. * delta ** 2))
 
 	print "Performing spectral clustering..."
-	spectral = SpectralClustering(n_clusters=10, eigen_solver='arpack', affinity='precomputed')
+	spectral = SpectralClustering(n_clusters=10, affinity='precomputed', n_init=100, assign_labels='discretize')
 	predicted_labels = spectral.fit_predict(M) # 1 x 6000
 	print "Done performing spectral clustering"
 
@@ -404,6 +427,10 @@ def getOptimalClusterLabelling(clusterAssignments):
 	for (digit, cluster) in sortedMapping:
 		print digit, ':', cluster
 
+	clusterDigitMapping = dict(zip(clusters, maxPerm))
+
+	return clusterDigitMapping
+
 def getClusterAssignments(predictedLabels):
 	# labelledDict stores the cluster -> nodes in cluster
 	labelledDict = {}
@@ -446,30 +473,35 @@ def run():
 	- You should be able to submit the csv made in run_svm to Kaggle directly
 	"""
 	# Load in 6000 x 6000 edges matrix of 0 and 1
-	# M = loadWeightedAdjacencyMatrix('adjacency_matrix.csv')
+	# M = loadWeightedAdjacencyMatrix('newWeightedAdjacencyMatrix.csv')
 	M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')
 
-	# # Do spectral embedding
-	# print "Performing spectral embedding..."
-	# embedder = manifold.SpectralEmbedding(n_components=1084, affinity='precomputed')
-	# X_se = embedder.fit_transform(M)
-	# print "Done performing spectral embedding"
+	# # # Do spectral embedding
+	# # print "Performing spectral embedding..."
+	# # embedder = manifold.SpectralEmbedding(n_components=1084, affinity='precomputed')
+	# # X_se = embedder.fit_transform(M)
+	# # print "Done performing spectral embedding"
 
-	# # Do clustering to get 10 clusters
+	# # # Do clustering to get 10 clusters
 	# predictedLabels = runAgglomerativeClustering(X_se)
 
-	predictedLabels = runSpectralClustering(M)
+	predictedLabels = runSpectralClustering(M) # 1 x 6000
 
 	clusterAssignments = getClusterAssignments(predictedLabels)
-	getOptimalClusterLabelling(clusterAssignments)
+	clusterDigitMapping = getOptimalClusterLabelling(clusterAssignments)
 	validateClusters(clusterAssignments)
-	
 
-	
-	# # Run SVM
-	# features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
-	# train_set, test_set = features[:6000], features[6000:]
-	# run_svm(train_set, test_set, train_labels)
+	train_labels = []
+	for cluster in predictedLabels:
+		train_labels.append(clusterDigitMapping[cluster])
+
+	train_labels = np.array(train_labels)
+
+	# # # Run SVM
+	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
+	train_set, test_set = features[:6000], features[6000:]
+	run_svm(train_set, test_set, train_labels)
+
 
 	"""
 	IGNORE COMMENTS BELOW THIS (WAS TESTING OUT RANDOM STUFF)
