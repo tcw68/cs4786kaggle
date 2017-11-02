@@ -1,19 +1,27 @@
 import numpy as np
 from sklearn.cluster import SpectralClustering, KMeans
 import matplotlib.pyplot as plt
-import networkx as nx
+# import networkx as nx
 from sklearn import neighbors
 from scipy.sparse import csgraph
 from itertools import combinations, permutations
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy import spatial
 from sklearn import datasets
+from sklearn import cross_decomposition as cd
 from sklearn.semi_supervised import label_propagation
 from sklearn import svm
 from sklearn import (manifold, datasets, decomposition, ensemble,
                      discriminant_analysis, random_projection)
 from time import time
-from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.cluster import AgglomerativeClustering, KMeans, Birch
+from sklearn.mixture import GaussianMixture
+from sklearn.neighbors import kneighbors_graph
+import random
+
+import lda
+import lda.datasets
+
 
 # Create distance matrix using updated matrix
 # 0 = identical, larger number = greater dissimilarity, infinity = not similar at all
@@ -160,6 +168,19 @@ def loadWeightedAdjacencyMatrix(fileName):
 
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(float)
+
+def loadMatrix(fileName, row, col):
+	with open(fileName, 'r') as f:
+		print "Loading unweighted adjacency matrix..."
+
+		M = np.zeros((row,col))
+		lines = f.readlines()
+		for i, line in enumerate(lines):
+			M[i,:] = [float(e) for e in line.split(',')]
+
+		print "Done loading unweighted adjacency matrix"
+		return M.astype(float)
+
 		
 def getLabelsDict(): 
 	with open('../Seed.csv', 'r') as f:
@@ -363,7 +384,7 @@ def run_svm(train_set, test_set, train_labels):
 			output[node-6001,0] = node
 			output[node-6001,1] = digit
 
-	np.savetxt("spectral_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	np.savetxt("se_gmm_svm_init15_find9s_3.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
 # Do spectral clustering to get 10 clusters
 def runSpectralClustering(M):
@@ -444,6 +465,12 @@ def getClusterAssignments(predictedLabels):
 
 	return labelledDict
 
+#Similar to CCA, performs dimensional reduction
+def runLDA(M):
+	model = lda.LDA(n_topics = 1084, n_iter = 1500, random_state = 1)
+	X = model.fit_transform(M)
+	return X
+
 def run():
 	"""
 	TRY THIS:
@@ -474,33 +501,134 @@ def run():
 	"""
 	# Load in 6000 x 6000 edges matrix of 0 and 1
 	# M = loadWeightedAdjacencyMatrix('newWeightedAdjacencyMatrix.csv')
-	M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')
+	# M = loadUnweightedAdjacencyMatrix('updatedWeightedMatrx.csv')
 
-	# # # Do spectral embedding
-	# # print "Performing spectral embedding..."
-	# # embedder = manifold.SpectralEmbedding(n_components=1084, affinity='precomputed')
-	# # X_se = embedder.fit_transform(M)
-	# # print "Done performing spectral embedding"
+	# replace72 = np.genfromtxt('replacescore72.csv')
+	# replace75 = np.genfromtxt('replacescore75.csv')
+	# replaceinit15 = np.genfromtxt('replaceinit15.csv')
+
+	# replaceDict = {}
+	# for i in replaceinit15:
+	# 	if replaceDict.has_key(i):
+	# 		replaceDict[i][0] = replaceDict[i][0]+1
+	# 		replaceDict[i].append(15)
+	# 	else:
+	# 		replaceDict[i] = [1,15]
+	# for i in replace72:
+	# 	if replaceDict.has_key(i):
+	# 		replaceDict[i][0] = replaceDict[i][0]+1
+	# 		replaceDict[i].append(72)
+	# 	else:
+	# 		replaceDict[i] = [1, 72]
+	# for i in replace75:
+	# 	if replaceDict.has_key(i):
+	# 		replaceDict[i][0] = replaceDict[i][0]+1
+	# 		replaceDict[i].append(75)
+	# 	else:
+	# 		replaceDict[i] = [1, 75]
+	# counter = []
+	# for k, v in replaceDict.items():
+	# 	if v[0] > 1 or 75 in v:
+	# 		counter.append(k)
+	# 	else:
+	# 		if bool(random.getrandbits(1)):
+	# 			counter.append(k)
+	# print len(counter)
+
+	# replace = np.array(counter)
+	# np.savetxt('final_replace.csv', replace.astype(int))
+	# quit()
+
+	# init15_2 = np.genfromtxt('se_gmm_svm_init15_2.csv', delimiter = ',', skip_header=1, dtype='int32')
+	# final_replace = np.genfromtxt('final_replace.csv', delimiter=',',dtype = 'int32')
+
+	# for j in final_replace:
+	# 	init15_2[j-6001,1] = 9
+
+	# np.savetxt("se_gmm_svm_modifying.csv", init15_2.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	# quit()
+
+	print "Generating features matrix"
+	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
+	print "Done generating features matrix"
+
+	# # M = getUnweightedAdjacencyMatrix()
+
+	# # # # Do spectral embedding
+	# print "Load spectral embedding..."
+	# X_se = loadMatrix('X_se.csv', 6000, 1084)
+	# print "Done loading spectral embedding"
+
+	print "Performing CCA"
+	# k = 70
+	# cca = cd.CCA(n_components = k)
+	# newX_se, _ = cca.fit_transform(X_se, features[:6000,:])
+	# np.savetxt('newX_se70.csv', newX_se)
+	print "Loading"
+	newX_se70 = np.genfromtxt('newX_se70.csv')
+	print "Done Loading"
+	print "Done performing CCA"
+
+	print "Performing gmm"
+	gmm = GaussianMixture(n_components=10, n_init = 15)
+	gmm.fit(newX_se70)
+	predictedLabels = gmm.predict(newX_se70)
+	print "Done performing gmm"
+
+	#print "Performing Birch"
+	# brc = Birch(n_clusters=10)
+	# predictedLabels = brc.fit_predict(newX_se70)
+	#print "Done performing birch"
+
+	# print "Performing KMeans"
+	# predictedLabels = runKMeansClustering(newX_se)
+	# predictedLabels2 = runKMeansClustering(newY_se)
+	# print "Done performing KMeans"
+
+	# print "Performing Agglomerative"
+	# A = kneighbors_graph(newX_se70, 800)
+	# linkage = AgglomerativeClustering(n_clusters = 10, linkage = 'ward', affinity='euclidean', connectivity=A)
+	# # linkage2 = AgglomerativeClustering(n_clusters = 10)
+	# predictedLabels = linkage.fit_predict(newX_se70)
+	# predictedLabels2 = linkage2.fit_predict(newY_se)
+	# print "Done performing Agglomerative"
+
+	# print "Performing Spectral Clustering"
+	# spectral = SpectralClustering(n_clusters = 10)
+	# # spectral2 = SpectralClustering(n_clusters = 10)
+	# predictedLabels = spectral.fit_predict(newX_se70)
+	# # predictedLabels2 = spectral2.fit_predict(ewY_se)
+	# print "Done performing spectral Clustering"
 
 	# # # Do clustering to get 10 clusters
 	# predictedLabels = runAgglomerativeClustering(X_se)
-
-	predictedLabels = runSpectralClustering(M) # 1 x 6000
+	# predictedLabels = runSpectralClustering(M) # 1 x 6000ssssssss
 
 	clusterAssignments = getClusterAssignments(predictedLabels)
 	clusterDigitMapping = getOptimalClusterLabelling(clusterAssignments)
 	validateClusters(clusterAssignments)
+
+	# clusterAssignments2 = getClusterAssignments(predictedLabels2)
+	# clusterDigitMapping2 = getOptimalClusterLabelling(clusterAssignments2)
+	# validateClusters(clusterAssignments2)
 
 	train_labels = []
 	for cluster in predictedLabels:
 		train_labels.append(clusterDigitMapping[cluster])
 
 	train_labels = np.array(train_labels)
+	# np.savetxt('train_labels_spectral_clustering.csv', train_labels)
+
+	# train_labels2 = []
+	# for cluster in predictedLabels:
+	# 	train_labels2.append(clusterDigitMapping2[cluster])
+
+	# train_labels2 = np.array(train_labels2)
 
 	# # # Run SVM
-	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 	train_set, test_set = features[:6000], features[6000:]
 	run_svm(train_set, test_set, train_labels)
+	# run_svm(train_set, test_set, train_labels2)
 
 
 	"""
