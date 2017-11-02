@@ -19,8 +19,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import kneighbors_graph
 import random
 
-import lda
-import lda.datasets
+# import lda
+# import lda.datasets
 
 
 # Create distance matrix using updated matrix
@@ -34,10 +34,10 @@ import lda.datasets
 # 	WM = np.full((6000,6000), float(100))
 # 	for i in range(M.shape[0]):
 # 		for j in range(M.shape[1]):
-# 			if i == j: 
+# 			if i == j:
 # 				WM[i,i] = 0
 # 				continue
-# 			if M[i,j] == 0: 
+# 			if M[i,j] == 0:
 # 				continue
 # 			elif M[i,j] == 1:
 # 				euclidean_distance = np.linalg.norm(features[i] - features[j])
@@ -59,10 +59,10 @@ import lda.datasets
 # 	WM = np.zeros((6000,6000))
 # 	for i in range(M.shape[0]):
 # 		for j in range(M.shape[1]):
-# 			if i == j: 
+# 			if i == j:
 # 				WM[i,i] = 1
 # 				continue
-# 			if M[i,j] == 0: 
+# 			if M[i,j] == 0:
 # 				continue
 # 			elif M[i,j] == 1:
 # 				euclidean_distance = np.linalg.norm(features[i] - features[j])
@@ -88,7 +88,7 @@ import lda.datasets
 # 		for j in range(M.shape[1]):
 # 			if i == j:
 # 				WM[i,j] = 0
-# 			if M[i,j] == 0: 
+# 			if M[i,j] == 0:
 # 				continue
 # 			else:
 # 				euclidean_distance = np.linalg.norm(features[i] - features[j])
@@ -111,7 +111,7 @@ def getWeightedMatrix(M):
 		for j in range(M.shape[1]):
 			if i == j:
 				WM[i,j] = 1
-			if M[i,j] == 0: 
+			if M[i,j] == 0:
 				continue
 			else:
 				euclidean_distance = np.linalg.norm(features[i] - features[j])
@@ -181,8 +181,8 @@ def loadMatrix(fileName, row, col):
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(float)
 
-		
-def getLabelsDict(): 
+
+def getLabelsDict():
 	with open('../Seed.csv', 'r') as f:
 		print "Filling in correct labels dictionary..."
 
@@ -209,7 +209,7 @@ def plotGraph(adjacency_matrix):
 	plt.show()
 	print "Done plotting graph for 6000 nodes"
 
-# Print which nodes in correct labels aren't connected 
+# Print which nodes in correct labels aren't connected
 def printConnectedGraphs(M, labels):
 	for digit, nodes in labels.items():
 		print 'Digit: %i' % digit
@@ -256,7 +256,7 @@ def runSpectralClustering(M):
 
 	spectral = SpectralClustering(n_clusters=10, eigen_solver='arpack', affinity='precomputed')
 	spectralClusters = spectral.fit_predict(features) # 1 x 6000
-	
+
 	clusters = {}
 	for idx, cluster in enumerate(spectralClusters):
 		clusters.setdefault(cluster, set()).add(idx+1)
@@ -283,7 +283,7 @@ def validateClusters(clusterAssignments):
 
 	print "Clusters dict"
 	for num, clusters in labelledClusters.items():
-		print num, ': ', clusters 
+		print num, ': ', clusters
 
 def load_clusters():
 	with open('clusters.csv', 'r') as f:
@@ -363,7 +363,7 @@ def runLabelPropagationSVM():
 
 	np.savetxt("label_prop_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-def run_svm(train_set, test_set, train_labels):
+def run_svm(train_set, test_set, train_labels, file_name):
 	print "Start running SVM..."
 	svmModel = svm.SVC()
 	svmModel.fit(train_set, train_labels)
@@ -384,7 +384,37 @@ def run_svm(train_set, test_set, train_labels):
 			output[node-6001,0] = node
 			output[node-6001,1] = digit
 
-	np.savetxt("se_gmm_svm_init15_find9s_3.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	np.savetxt(file_name, output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+
+
+
+def run_svm_updated(train_set, test_set, train_labels, file_name, goodNodes, badNodes):
+	print "Start running updated SVM..."
+	svmModel = svm.SVC()
+	svmModel.fit(train_set, train_labels)
+	print "Finished running SVM"
+
+	finalLabelsDict = {}
+	final_labels = svmModel.predict(test_set)
+
+	for idx, label in enumerate(final_labels):
+		finalLabelsDict[badNodes[idx]] = label
+
+	output = np.zeros((4000,2), dtype='int32')
+	index = 6000
+	for node in range(6001,10001):
+		if node in goodNodes:
+			output[node-6001,0] = node
+			output[node-6001,1] = train_labels[index]
+			index += 1
+		else:
+			output[node-6001,0] = node
+			output[node-6001,1] = finalLabelsDict[node]
+
+	np.savetxt(file_name, output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+
+
+
 
 # Do spectral clustering to get 10 clusters
 def runSpectralClustering(M):
@@ -410,7 +440,7 @@ def runAgglomerativeClustering(X, linkage='ward'):
 # Do K-means clustering to get 10 clusters
 def runKMeansClustering(M):
 	print "Performing KMeans clustering..."
-	kmeans = KMeans(n_clusters=10)
+	kmeans = KMeans(n_clusters=10, n_init=1000)
 	predicted_labels = kmeans.fit_predict(M)
 	print "Done performing KMeans clustering"
 
@@ -481,7 +511,7 @@ def run():
 	- Perform Spectral embedding to get X_se
 		- What spectral embedding does is that it allows you to apply your own clustering algorithm
 		- Spectral clustering is just a combination of spectral embedding and k-means clustering
-		- We prob want to use single linkage clustering or our own clustering in place of k-means 
+		- We prob want to use single linkage clustering or our own clustering in place of k-means
 		  since k-means doesn't do that well.
 	- Pass X_se into the clustering algorithm with n_clusters = 10
 		- I'm using agglomerative clustering right now, which is related to single linkage clustering
@@ -492,11 +522,10 @@ def run():
 	- Now you should have a 1 x 6000 array where every element at index i corresponds to the digit that node i+1 is assigned to
 		- Call this array Y for example
 	- Now you can call run_svm function above
-		- run_svm(train_set, test_set, train_labels)
+		- run_svm(train_set, test_set, train_labels, file_name)
 			- train_set = features[:6000]
 			- test_set = features[6000:]
 			- train_labels = Y from above
-		- Make sure to rename the csv in run_svm if you want a new output file
 	- You should be able to submit the csv made in run_svm to Kaggle directly
 	"""
 	# Load in 6000 x 6000 edges matrix of 0 and 1
@@ -554,36 +583,54 @@ def run():
 
 	# # M = getUnweightedAdjacencyMatrix()
 
-	# # # # Do spectral embedding
-	# print "Load spectral embedding..."
-	# X_se = loadMatrix('X_se.csv', 6000, 1084)
-	# print "Done loading spectral embedding"
+	# # # Do spectral embedding
+	print "Load spectral embedding..."
+	X_se = loadMatrix('../X_se.csv', 6000, 1084)
+	print "Done loading spectral embedding"
 
 	print "Performing CCA"
-	# k = 70
-	# cca = cd.CCA(n_components = k)
-	# newX_se, _ = cca.fit_transform(X_se, features[:6000,:])
-	# np.savetxt('newX_se70.csv', newX_se)
-	print "Loading"
-	newX_se70 = np.genfromtxt('newX_se70.csv')
-	print "Done Loading"
+	k = 80
+	# cca = cd.CCA(n_components=k, max_iter=5000)
+	# Y1, Y2 = cca.fit_transform(X_se, features[:6000,:])
+	# np.savetxt('../X_se_cca_'+str(k)+'_y1.csv', Y1)
+	# np.savetxt('../X_se_cca_'+str(k)+'_y2.csv', Y2)
+	# print "Loading"
+	Y1 = np.genfromtxt('../X_se_cca_'+str(k)+'_y1.csv')
+	Y2 = np.genfromtxt('../X_se_cca_'+str(k)+'_y2.csv')
+	# print "Done Loading"
 	print "Done performing CCA"
 
-	print "Performing gmm"
-	gmm = GaussianMixture(n_components=10, n_init = 15)
-	gmm.fit(newX_se70)
-	predictedLabels = gmm.predict(newX_se70)
-	print "Done performing gmm"
+	Y = np.concatenate((Y1, Y2), axis=1)
+
+	# print "Performing gmm"
+	# gmm = GaussianMixture(n_components=10, n_init = 15)
+	# gmm.fit(Y)
+	# predictedLabels = gmm.predict(Y)
+	# print "Done performing gmm"
 
 	#print "Performing Birch"
 	# brc = Birch(n_clusters=10)
 	# predictedLabels = brc.fit_predict(newX_se70)
 	#print "Done performing birch"
 
-	# print "Performing KMeans"
-	# predictedLabels = runKMeansClustering(newX_se)
-	# predictedLabels2 = runKMeansClustering(newY_se)
-	# print "Done performing KMeans"
+	print "Performing KMeans clustering..."
+	# kmeans = KMeans(n_clusters=10, n_init=2000)
+	# predictedLabels = kmeans.fit_predict(Y)
+	# print "Done performing KMeans clustering"
+
+	# print "Writing to file..."
+	# with open('../predictedLabels.csv', 'w') as f:
+	# 	for label in predictedLabels:
+	# 		f.write(str(label))
+	# 		f.write('\n')
+
+	predictedLabels = []
+	with open('../predictedLabels.csv', 'r') as f:
+		lines = f.readlines()
+		for label in lines:
+			predictedLabels.append(int(label))
+	predictedLabels = np.array(predictedLabels)
+	print predictedLabels.shape
 
 	# print "Performing Agglomerative"
 	# A = kneighbors_graph(newX_se70, 800)
@@ -615,8 +662,8 @@ def run():
 	train_labels = []
 	for cluster in predictedLabels:
 		train_labels.append(clusterDigitMapping[cluster])
+	print "tl", len(train_labels)
 
-	train_labels = np.array(train_labels)
 	# np.savetxt('train_labels_spectral_clustering.csv', train_labels)
 
 	# train_labels2 = []
@@ -625,9 +672,39 @@ def run():
 
 	# train_labels2 = np.array(train_labels2)
 
+	print "Adjusting train labels..."
+	badNodes = []
+	with open('../bad.csv') as f:
+		lines = f.readlines()
+		for node in lines:
+			badNodes.append(int(node))
+
+	goodNodes = []
+	with open('../se_cca80_kmeans_2000init_svm.csv', 'r') as f:
+		lines = f.readlines()
+		for line in lines[1:]:
+			node, digit = [int(e) for e in line.split(',')]
+			if node not in badNodes:
+				train_labels.append(digit)
+				goodNodes.append(node)
+
+	train_labels = np.array(train_labels)
+	print "tl", train_labels.shape
+
 	# # # Run SVM
-	train_set, test_set = features[:6000], features[6000:]
-	run_svm(train_set, test_set, train_labels)
+	print "More adjusting..."
+	train_set, test_set = np.zeros((9171,1084)), np.zeros((829,1084))
+	print "trs", train_set.shape
+	print "tes", test_set.shape
+	train_set[:6000,:] = features[:6000]
+	for i, node in enumerate(goodNodes):
+		train_set[i,:] = features[node-1]
+	print "trs", train_set.shape
+	for i, node in enumerate(badNodes):
+		test_set[i,:] = features[node-6001]
+	print "tes", test_set.shape
+
+	run_svm_updated(train_set, test_set, train_labels, "../willThisWork.csv", goodNodes, badNodes)
 	# run_svm(train_set, test_set, train_labels2)
 
 
@@ -640,7 +717,7 @@ def run():
 
 
 
-	# M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')	
+	# M = loadUnweightedAdjacencyMatrix('unweightedAdjacencyMatrix.csv')
 	# WM = findWeightedMatrix(M)
 
 	# 1 : [2, 5, 111, 50, 19, 37]
@@ -680,7 +757,7 @@ def run():
 	# # 		featureVectors[i,:] = features[node-1,:]
 
 	# # 	avgVector = np.mean(featureVectors, axis=0)
-		
+
 	# # 	centroids[cluster,:] = avgVector
 
 	# for digit, nodes in labels.items():
@@ -713,7 +790,7 @@ def run():
 
 
 
- 
+
 # You can see here that running spectral clustering on the adjacency matrix
 # for the 60 labelled nodes gets the perfect clustering
 def checkLabelledNodes():
@@ -752,7 +829,7 @@ def checkLabelledNodes():
 
 	print "Digit | Clusters"
 	for num, clusters in labelledClusters.items():
-		print num, '  :  ', clusters 
+		print num, '  :  ', clusters
 
 
 if __name__ == '__main__':
