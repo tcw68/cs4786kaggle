@@ -23,6 +23,18 @@ from scipy.stats import mode
 import lda
 import lda.datasets
 
+print "Generating features matrix"
+features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
+print "Done generating features matrix"
+
+print "Generating similarity matrix"
+M = np.genfromtxt("../Graph.csv", delimiter = ',')
+print "Done generating similarity matrix"
+
+print "Generating seed matrix"
+seed = np.genfromtxt("../Seed.csv", delimiter = ',')
+print "Done generating similarity matrix"
+
 
 # Create distance matrix using updated matrix
 # 0 = identical, larger number = greater dissimilarity, infinity = not similar at all
@@ -364,7 +376,7 @@ def runLabelPropagationSVM():
 
 	np.savetxt("label_prop_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-def run_svm(train_set, test_set, train_labels):
+def run_svm(train_set, test_set, train_labels, fileName):
 	print "Start running SVM..."
 	svmModel = svm.SVC()
 	svmModel.fit(train_set, train_labels)
@@ -385,7 +397,7 @@ def run_svm(train_set, test_set, train_labels):
 			output[node-6001,0] = node
 			output[node-6001,1] = digit
 
-	np.savetxt("se_gmm_svm_x_se.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+	np.savetxt(fileName, output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
 def run_svm2(train_set, test_set, train_labels):
 	print "Start running SVM..."
@@ -477,11 +489,92 @@ def getClusterAssignments(predictedLabels):
 
 	return labelledDict
 
-#Similar to CCA, performs dimensional reduction
-def runLDA(M):
-	model = lda.LDA(n_topics = 1084, n_iter = 1500, random_state = 1)
-	X = model.fit_transform(M)
-	return X
+#Find the nodes that are right and wrong and try running SVM again to fix the wrong nodes
+def runModelTwice():
+	bestScoreUsingGMM = np.genfromtxt('se_gmm_svm 3.csv', delimiter=',', dtype='int32', skip_header=1)
+	bestScoreUsingKMeansXY = np.genfromtxt('se_cca80_kmeans_2000init_svm.csv', delimiter=',', dtype='int32', skip_header=1)
+	gmmPlusModifying = np.genfromtxt('se_gmm_svm_modifying.csv', delimiter = ',', dtype='int32', skip_header=1)
+	kMeansX = np.genfromtxt('se_cca_kmeans_svm.csv', delimiter=',', dtype='int32', skip_header=1)
+
+	wrong = {}
+	right = {}
+	for j in range(thomas.shape[0]):
+		if not (thomas[j, 1] == logan[j, 1] and thomas[j, 1] == modifying[j, 1] and thomas[j, 1] == k[j, 1]):
+			wrong[thomas[j,0]] = (thomas[j, 1], logan[j, 1], modifying[j,1], k[j,1])
+		else:
+			right[thomas[j,0]] = thomas[j,1]
+
+	npRight = np.zeros((3171, 1084))
+	for i, k in enumerate(right.keys()):
+		npRight[i,:] = features[k-1,:]
+
+	npDigits = np.zeros((3171,1))
+	for i,(k, v) in enumerate(right.items()):
+		npDigits[i,:] = right[k]
+
+	npTest = np.zeros((829,1084))
+	for i,(k, v) in enumerate(wrong.items()):
+		npTest[i,:] = features[k-1,:]
+
+	training_set = np.concatenate((features[:6000,:], npRight), axis=0)
+	labelsFor6000 = np.genfromtxt('labelsfor6000.csv', dtype='int32')
+	labelsFor6000 = np.reshape(labelsFor6000, (6000, 1))
+	training_labels = np.concatenate((labels6000, npDigits), axis=0)
+
+	run_svm(training_set, npTest, training_labels, "newDigitsForWrong.csv")
+
+	labelsWrong = np.genfromtxt('newDigitsForWrong.csv', dtype='int32')
+	newDict = {}
+
+	for i in range(replacement.shape[0]):
+		bestScoreUsingGMM[i, 0] = labelsWrong[i, 1]
+
+	np.savetxt('svmTwice.csv', bestScoreUsingGMM.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+
+	#Look at the final digits for those that were wrong and see if SVM
+	#changed the digit to something that is unlikely such as 4 -> 0
+	#because they don't look alike
+	for k in wrong.iterkeys():
+		print (bestScoreUsingKMeansXY[k-1, 1], bestScoreUsingGMM[k-1, 1])
+
+#GMM results in very few or no 9s therefore replace the nodes that are 9s from
+#KMeans to 9s in GMM
+def replaceGMMwithKMeans9s(fileNameGMM, fileNameKMeans):
+	gmm = np.genfromtxt(fileNameGMM, dtype='int32', delimiter = ',')
+	kmeans = np.genfromtxt(fileNameKMeans. dtype='int32', delimiter = ',')
+
+	for i in range(kmeans.shape[0]):
+		if kmeans[i, 1] == 9:
+			gmm[i, 1] = 9
+
+	np.savetxt('gmm_9s_replaced.csv', gmm.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
+
+def performCCA(k, training_set, target_set):
+	print "Performing CCA"
+	cca = cd.CCA(n_components = k)
+	newX_se, newY_se = cca.fit_transform(training_set, target_set)
+	np.savetxt('newX_se.csv', newX_se)
+	np.savetxt('newY_se.csv', newY_se)
+	print "Done performing CCA"
+
+def loadCCA(fileNameX, fileNameY = ""):
+	print "Loading CCA"
+	X = np.genfromtxt(fileNameX, delimiter = ',')
+	Y = []
+	if not (fileNameY == ""):
+		Y = np.genfromtxt(fileNameY, delimiter = ',')
+	print "Done Loading CCA"
+
+	return X, Y
+
+
+def spectralEmbedding(M):
+	se = manifold.SpectralEmbedding(n_components = 1084)
+	X_se = se.fit_transform(M)
+	np.savetxt("X_se.csv")
+
+def loadSpectralEmbedding(fileName):
+	return np.genfromtxt(fileName, delimier = ',')
 
 def run():
 	"""
@@ -511,6 +604,9 @@ def run():
 		- Make sure to rename the csv in run_svm if you want a new output file
 	- You should be able to submit the csv made in run_svm to Kaggle directly
 	"""
+
+
+
 	# Load in 6000 x 6000 edges matrix of 0 and 1
 	# M = loadWeightedAdjacencyMatrix('newWeightedAdjacencyMatrix.csv')
 	# M = loadUnweightedAdjacencyMatrix('updatedWeightedMatrx.csv')
@@ -560,75 +656,6 @@ def run():
 	# np.savetxt("se_gmm_svm_modifying.csv", init15_2.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 	# quit()
 
-	print "Generating features matrix"
-	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
-	print "Done generating features matrix"
-
-	# replacement = np.genfromtxt('replacement.csv', delimiter=',', dtype='int32', skip_header=1)
-	# new_submission = np.genfromtxt('se_gmm_svm_3_modified.csv', delimiter=',', dtype='int32', skip_header=1)
-
-	# for i in range(replacement.shape[0]):
-	# 	if replacement[i, 1] == 9:
-	# 		new_submission[i, 1] = 9
-
-	# np.savetxt('please_Work.csv', new_submission.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
-	# quit()
-
-	# thomas = np.genfromtxt('se_gmm_svm 3.csv', delimiter=',', dtype='int32', skip_header=1)
-	# logan = np.genfromtxt('se_cca80_kmeans_2000init_svm.csv', delimiter=',', dtype='int32', skip_header=1)
-	# modifying = np.genfromtxt('se_gmm_svm_modifying.csv', delimiter = ',', dtype='int32', skip_header=1)
-	# k = np.genfromtxt('se_cca_kmeans_svm.csv', delimiter=',', dtype='int32', skip_header=1)
-
-	# score_7525 = np.genfromtxt('se_gmm_svm_3_modified.csv', delimiter = ',', dtype='int32')
-	# score_72 = np.genfromtxt('se_gmm_svm 3.csv', delimiter=',', dtype='int32')
-
-
-	# wrong = {}
-	# right = {}
-	# for j in range(thomas.shape[0]):
-	# 	if not (thomas[j, 1] == logan[j, 1] and thomas[j, 1] == modifying[j, 1] and thomas[j, 1] == k[j, 1]):
-	# 		wrong[thomas[j,0]] = (thomas[j, 1], logan[j, 1], modifying[j,1], k[j,1])
-	# 	else:
-	# 		right[thomas[j,0]] = thomas[j,1]
-
-	# labelsWrong = np.genfromtxt('labels_for_wrong.csv', dtype='int32')
-	# keys = []
-	# labels = []
-	# newDict = {}
-	# for k in wrong.keys():
-	# 	if score_7525[k-6001, 1] != score_72[k-6001, 1]:
-	# 		newDict[k] = (score_7525[k-6001, 1], score_72[k-6001, 1])
-
-	# for k in sorted(newDict.iterkeys()):
-	# 	print (k, newDict[k])
-	# quit()
-
-	# for label in labelsWrong:
-	# 	labels.append(label)
-
-	# for i in range(len(keys)):
-	# 	thomas[keys[i]-6001, 1] = labels[i]
-
-	# np.savetxt('se_gmm_svm_3_modified.csv', thomas.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
-	# quit()
-	# npRight = np.zeros((3171, 1084))
-	# for i, k in enumerate(right.keys()):
-	# 	npRight[i,:] = features[k-1,:]
-
-	# npDigits = np.zeros((3171,1))
-	# for i,(k, v) in enumerate(right.items()):
-	# 	npDigits[i,:] = right[k]
-
-	# npTest = np.zeros((829,1084))
-	# for i,(k, v) in enumerate(wrong.items()):
-	# 	npTest[i,:] = features[k-1,:]
-
-	# training_set = np.concatenate((features[:6000,:], npRight), axis=0)
-	# labels6000 = np.genfromtxt('labelsfor6000.csv', dtype='int32')
-	# labels6000 = np.reshape(labels6000, (6000, 1))
-	# training_labels = np.concatenate((labels6000, npDigits), axis=0)
-
-	# run_svm2(training_set, npTest, training_labels)
 
 	# predictedLabels = sModel.predict(npTest)
 
@@ -638,22 +665,8 @@ def run():
 
 	# # # M = getUnweightedAdjacencyMatrix()
 
-	# # # Do spectral embedding
-	# print "Load spectral embedding..."
-	# X_se = loadMatrix('X_se.csv', 6000, 1084)
-	# print "Done loading spectral embedding"
+	spectralEmbedding()
 
-	# print "Performing CCA"
-	# # k = 80
-	# # cca = cd.CCA(n_components = k)
-	# # newX_se, newY_se = cca.fit_transform(X_se, features[:6000,:])
-	# # np.savetxt('newX_se80.csv', newX_se)
-	# # np.savetxt('newY_se80.csv', newY_se)
-	# print "Loading"
-	newX_se70 = np.genfromtxt('X_se_cca_70y1.csv')
-	newY_se70 = np.genfromtxt('X_se_cca_70y2.csv')
-	print "Done Loading"
-	# # print "Done performing CCA"
 
 	new_se = np.concatenate((newX_se70, newY_se70), axis=1)
 
