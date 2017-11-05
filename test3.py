@@ -1,24 +1,16 @@
+import random
 import numpy as np
-from sklearn.cluster import SpectralClustering, KMeans
 import matplotlib.pyplot as plt
-# import networkx as nx
-from sklearn import neighbors
-from scipy.sparse import csgraph
 from itertools import combinations, permutations
-from sklearn.metrics.pairwise import cosine_similarity
-from scipy import spatial
-from sklearn import datasets
+
+from sklearn import svm, manifold
 from sklearn import cross_decomposition as cd
 from sklearn.semi_supervised import label_propagation
-from sklearn import svm
-from sklearn import (manifold, datasets, decomposition, ensemble,
-                     discriminant_analysis, random_projection)
-from time import time
-from sklearn.cluster import AgglomerativeClustering, KMeans, Birch
+from sklearn.cluster import SpectralClustering, AgglomerativeClustering, KMeans, Birch
 from sklearn.mixture import GaussianMixture
-import random
+from sklearn.metrics.pairwise import cosine_similarity
 
-#Load given CSV files
+# Load given CSV files
 print "Generating features matrix"
 features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 print "Done generating features matrix"
@@ -31,10 +23,10 @@ print "Generating seed matrix"
 seed = np.genfromtxt("../Seed.csv", delimiter = ',')
 print "Done generating similarity matrix"
 
-#Train on first 6000 nodes and test on last 4000 nodes
+# Train on first 6000 nodes and test on last 4000 nodes
 train_set, test_set = features[:6000], features[6000:]
 
-#Find the weighted adjacency matrix using the feature vectors
+# Find the weighted adjacency matrix using the feature vectors
 def getWeightedMatrix(M):
 	print "Creating features matrix..."
 	features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
@@ -74,7 +66,7 @@ def getUnweightedAdjacencyMatrix():
 		print "Done creating unweighted adjacency matrix"
 		return M
 
-#Write the adjacency matrix to csv
+# Write the adjacency matrix to csv
 def writeUnweightedAdjacencyMatrixToCSV(fileName, M):
 	with open(fileName, 'wb') as f:
 		print "Writing unweighted adjacency matrix to CSV..."
@@ -83,7 +75,7 @@ def writeUnweightedAdjacencyMatrixToCSV(fileName, M):
 			f.write('%s\n' % line)
 		print "Wrote unweighted adjacency matrix to CSV"
 
-#Load adjacency matrix from csv
+# Load adjacency matrix from csv
 def loadUnweightedAdjacencyMatrix(fileName):
 	with open(fileName, 'r') as f:
 		print "Loading unweighted adjacency matrix..."
@@ -96,7 +88,7 @@ def loadUnweightedAdjacencyMatrix(fileName):
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(int)
 
-#Load weighted adjacency matrix from csv
+# Load weighted adjacency matrix from csv
 def loadWeightedAdjacencyMatrix(fileName):
 	with open(fileName, 'r') as f:
 		print "Loading unweighted adjacency matrix..."
@@ -109,7 +101,7 @@ def loadWeightedAdjacencyMatrix(fileName):
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(float)
 
-#Load any matrix from csv, need to specify the number of rows and columns
+# Load any matrix from csv, need to specify the number of rows and columns
 def loadMatrix(fileName, row, col):
 	with open(fileName, 'r') as f:
 		print "Loading unweighted adjacency matrix..."
@@ -122,7 +114,7 @@ def loadMatrix(fileName, row, col):
 		print "Done loading unweighted adjacency matrix"
 		return M.astype(float)
 
-#Find which seed nodes are for each digit		
+# Find which seed nodes are for each digit		
 def getLabelsDict(): 
 	with open('../Seed.csv', 'r') as f:
 		print "Filling in correct labels dictionary..."
@@ -136,12 +128,12 @@ def getLabelsDict():
 		print "Done filling in correct labels dictionary"
 		return labels
 
-#Print the dictionary
+# Print the dictionary
 def printDict(d):
 	for key, val in d.items():
 		print key, ':', val
 
-#Plot the adjacency matrix
+# Plot the adjacency matrix
 def plotGraph(adjacency_matrix):
 	print "Plotting graph for 6000 nodes..."
 	rows, cols = np.where(adjacency_matrix == 1)
@@ -192,7 +184,7 @@ def updateUnweightedAdjacencyMatrix(M, labels):
 
 	return M
 
-#Run spectral clustering and return the clusters
+# Run spectral clustering and return the clusters
 def runSpectralClustering(M):
 	# delta = np.std(M)
 	# M = np.exp(- M ** 2 / (2. * delta ** 2))
@@ -207,7 +199,7 @@ def runSpectralClustering(M):
 
 	return clusters
 
-#Write the clusters returned form a clustering algorithm to CSV
+# Write the clusters returned form a clustering algorithm to CSV
 def writeClustersToCSV(clusters):
 	with open('new_clusters.csv', 'wb') as f:
 		for cluster, nodes in clusters.items():
@@ -216,7 +208,7 @@ def writeClustersToCSV(clusters):
 			f.write('\n')
 	print "Wrote clusters to csv"
 
-#Print out which nodes are in which clusters
+# Print out which nodes are in which clusters
 def validateClusters(clusterAssignments):
 	labels = getLabelsDict()
 
@@ -231,7 +223,7 @@ def validateClusters(clusterAssignments):
 	for num, clusters in labelledClusters.items():
 		print num, ': ', clusters 
 
-#Load clusters from CSV file
+# Load clusters from CSV file
 def load_clusters():
 	with open('clusters.csv', 'r') as f:
 		lines = f.readlines()
@@ -242,7 +234,7 @@ def load_clusters():
 
 		return clusters
 
-#Label propagation with SVM, did not result in a very good score
+# Label propagation with SVM, did not result in a very good score
 def runLabelPropagationSVM():
 	labels = getLabelsDict()
 
@@ -311,8 +303,8 @@ def runLabelPropagationSVM():
 
 	np.savetxt("label_prop_svm.csv", output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-#Run svm on the training set and predict labels for the test set
-#Save the predicted labels for the test set to fileName
+# Run svm on the training set and predict labels for the test set
+# Save the predicted labels for the test set to fileName
 def run_svm(train_set, test_set, train_labels, fileName):
 	print "Start running SVM..."
 	svmModel = svm.SVC()
@@ -336,7 +328,7 @@ def run_svm(train_set, test_set, train_labels, fileName):
 
 	np.savetxt(fileName, output.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-#SVM ran again on the wrong nodes to try and better predict the labels
+# SVM ran again on the wrong nodes to try and better predict the labels
 def run_svm_again(train_set, test_set, train_labels, fileName):
 	print "Start running SVM..."
 	svmModel = svm.SVC()
@@ -377,7 +369,7 @@ def runKMeansClustering(M):
 
 	return predicted_labels
 
-#Do Gaussian Mixture Model Clustering to get 10 clusters
+# Do Gaussian Mixture Model Clustering to get 10 clusters
 def runGaussianMixture(M):
 	print "Performing Gaussian Mixture"
 	gmm = GaussianMixture(n_components = 10, n_init = 15)
@@ -423,7 +415,7 @@ def getOptimalClusterLabelling(clusterAssignments):
 
 	return clusterDigitMapping
 
-#Find how many nodes are in each cluster
+# Find how many nodes are in each cluster
 def getClusterAssignments(predictedLabels):
 	# labelledDict stores the cluster -> nodes in cluster
 	labelledDict = {}
@@ -437,7 +429,7 @@ def getClusterAssignments(predictedLabels):
 
 	return labelledDict
 
-#Find the nodes that are right and wrong and try running SVM again to fix the wrong nodes
+# Find the nodes that are right and wrong and try running SVM again to fix the wrong nodes
 def runModelTwice():
 	bestScoreUsingGMM = np.genfromtxt('se_gmm_svm 3.csv', delimiter=',', dtype='int32', skip_header=1)
 	bestScoreUsingKMeansXY = np.genfromtxt('se_cca80_kmeans_2000init_svm.csv', delimiter=',', dtype='int32', skip_header=1)
@@ -485,8 +477,8 @@ def runModelTwice():
 	for k in wrong.iterkeys():
 		print (bestScoreUsingKMeansXY[k-1, 1], bestScoreUsingGMM[k-1, 1])
 
-#GMM results in very few or no 9s therefore replace the nodes that are 9s from
-#KMeans to 9s in GMM
+# GMM results in very few or no 9s therefore replace the nodes that are 9s from
+# KMeans to 9s in GMM
 def replaceGMMwithKMeans9s(fileNameGMM, fileNameKMeans):
 	gmm = np.genfromtxt(fileNameGMM, dtype='int32', delimiter = ',')
 	kmeans = np.genfromtxt(fileNameKMeans, dtype='int32', delimiter = ',')
@@ -497,14 +489,14 @@ def replaceGMMwithKMeans9s(fileNameGMM, fileNameKMeans):
 
 	np.savetxt('gmm_9s_replaced.csv', gmm.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-#Perform CCA on two different views and reduce to the k most correlated dimensions
+# Perform CCA on two different views and reduce to the k most correlated dimensions
 def performCCA(k, training_set, target_set, fileNameX, fileNameY):
 	cca = cd.CCA(n_components = k)
 	newX_se, newY_se = cca.fit_transform(training_set, target_set)
 	np.savetxt(fileNameX, newX_se)
 	np.savetxt(fileNameY, newY_se)
 
-#Load CCA results from CSV files
+# Load CCA results from CSV files
 def loadCCA(fileNameX, fileNameY = ""):
 	X = np.genfromtxt(fileNameX, delimiter = ',')
 	Y = []
@@ -513,17 +505,17 @@ def loadCCA(fileNameX, fileNameY = ""):
 
 	return X, Y
 
-#Perform Spectral Embedding on the similarity graph to 1084
+# Perform Spectral Embedding on the similarity graph to 1084
 def spectralEmbedding(M, fileName):
 	se = manifold.SpectralEmbedding(n_components = 1084)
 	X_se = se.fit_transform(M)
 	np.savetxt(fileName, X_se, delimiter=',')
 
-#Load the results of Spectral Embedding from a CSV file
+# Load the results of Spectral Embedding from a CSV file
 def loadSpectralEmbedding(fileName):
 	return np.genfromtxt(fileName, delimier = ',')
 
-#Find the digit labels for each node in the training set
+# Find the digit labels for each node in the training set
 def findTrainingLabels(labels):
 	clusterAssignments = getClusterAssignments(labels)
 	clusterDigitMapping = getOptimalClusterLabelling(clusterAssignments)
@@ -612,12 +604,6 @@ def run():
 	agglomerative_train_labels = findTrainingLabels(agglomerative_predicted_labels)
 
 	run_svm(train_set, test_set, agglomerative_train_labels, "se_cca_agglomerative_svm.csv")
-
-
-	"""
-	IGNORE COMMENTS BELOW THIS (WAS TESTING OUT RANDOM STUFF)
-	"""
-
 
 if __name__ == '__main__':
 	np.set_printoptions(threshold=np.nan)
