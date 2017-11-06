@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from itertools import combinations, permutations
 
-from sklearn import svm, manifold
+from sklearn import svm
 from sklearn import cross_decomposition as cd
 from sklearn.semi_supervised import label_propagation
 from sklearn.cluster import SpectralClustering, AgglomerativeClustering, KMeans, Birch
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.manifold import SpectralEmbedding, TSNE
 
 # Load given CSV files
 print "Generating features matrix"
@@ -471,9 +472,9 @@ def runModelTwice():
 
 	np.savetxt('svmTwice.csv', bestScoreUsingGMM.astype(int), fmt='%i', delimiter=",", header="Id,Label", comments='')
 
-	#Look at the final digits for those that were wrong and see if SVM
-	#changed the digit to something that is unlikely such as 4 -> 0
-	#because they don't look alike
+	# Look at the final digits for those that were wrong and see if SVM
+	# changed the digit to something that is unlikely such as 4 -> 0
+	# because they don't look alike
 	for k in wrong.iterkeys():
 		print (bestScoreUsingKMeansXY[k-1, 1], bestScoreUsingGMM[k-1, 1])
 
@@ -507,7 +508,7 @@ def loadCCA(fileNameX, fileNameY = ""):
 
 # Perform Spectral Embedding on the similarity graph to 1084
 def spectralEmbedding(M, fileName):
-	se = manifold.SpectralEmbedding(n_components = 1084)
+	se = SpectralEmbedding(n_components = 1084)
 	X_se = se.fit_transform(M)
 	np.savetxt(fileName, X_se, delimiter=',')
 
@@ -570,7 +571,36 @@ def checkLabelledNodes():
 	for num, clusters in labelledClusters.items():
 		print num, '  :  ', clusters 
 
+# Visualize the clustering on a 2D graph
+# Credit: Special thanks to Ilan Filonenko for this plotting approach
+def visualizeClusters(M, clusters, title="Clustering"):
+	tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=500)
+	tsne_data = tsne.fit_transform(M)
+
+	plt.title(title)
+	plt.scatter(tsne_data[:,0], tsne_data[:,1], c=clusters, cmap=plt.cm.get_cmap("jet", 10))
+	plt.colorbar(ticks=range(10))
+	plt.clim(-0.5, 9.5)
+	plt.colorbar()
+	plt.show()
+
 def run():
+	M = loadUnweightedAdjacencyMatrix('UnweightedAdjacencyMatrix.csv')
+	predictedLabels = runSpectralClustering(M)
+
+	clusterAssignments = getClusterAssignments(predictedLabels)
+	clusterDigitMapping = getOptimalClusterLabelling(clusterAssignments)
+	validateClusters(clusterAssignments)
+
+	trainLabels = []
+	for cluster in predictedLabels:
+		trainLabels.append(clusterDigitMapping[cluster])
+
+	trainLabels = np.array(trainLabels)
+
+	visualizeClusters(M, trainLabels, "Spectral Clustering")
+
+def run1():
 	print "Performing Spectral Embedding"
 	spectralEmbedding(M, "spectral_embedding.csv")
 	X_se = loadSpectralEmbedding("spectral_embedding.csv")
@@ -584,21 +614,21 @@ def run():
 	if not (Y == []):
 		new_se = np.concatenate((X, Y), axis=1)
 
-	#Predict clusters using GMM, use new_se if using both X and Y
+	# Predict clusters using GMM, use new_se if using both X and Y
 	gmm_predicted_labels = runGaussianMixture(X)
 
 	gmm_train_labels = findTrainingLabels(gmm_predicted_labels)
 
 	run_svm(train_set, test_set, gmm_train_labels, "se_cca_gmm_svm.csv")
 
-	#Predict clusters using KMeans, use X if using just X
+	# Predict clusters using KMeans, use X if using just X
 	kmeans_predicted_labels = runKMeansClustering(new_se)
 
 	kmeans_train_labels = findTrainingLabels(kmeans_predicted_labels)
 
 	run_svm(train_set, test_set, kmeans_train_labels, "se_cca_kmeans_svm.csv")
 
-	#Predict clusters using agglomerative, use new_se if using both X and Y
+	# Predict clusters using agglomerative, use new_se if using both X and Y
 	agglomerative_predicted_labels = runAgglomerativeClustering(X)
 
 	agglomerative_train_labels = findTrainingLabels(agglomerative_predicted_labels)
