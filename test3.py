@@ -16,16 +16,16 @@ print "Generating features matrix"
 features = np.genfromtxt('../Extracted_features.csv', delimiter = ',')
 print "Done generating features matrix"
 
-print "Generating similarity matrix"
-M = np.genfromtxt("../Graph.csv", delimiter = ',')
-print "Done generating similarity matrix"
+# print "Generating similarity matrix"
+# M = np.genfromtxt("../Graph.csv", delimiter = ',')
+# print "Done generating similarity matrix"
 
 print "Generating seed matrix"
-seed = np.genfromtxt("../Seed.csv", delimiter = ',')
+seed = np.genfromtxt("../Seed.csv", delimiter = ',', dtype='int32')
 print "Done generating similarity matrix"
 
 # Train on first 6000 nodes and test on last 4000 nodes
-train_set, test_set = features[:6000], features[6000:]
+# train_set, test_set = features[:6000], features[6000:]
 
 # Find the weighted adjacency matrix using the feature vectors
 def getWeightedMatrix(M):
@@ -340,6 +340,15 @@ def run_svm_again(train_set, test_set, train_labels, fileName):
 
 	np.savetxt(fileName, final_labels.astype(int), fmt='%i', delimiter=",", header="Label", comments='')
 
+def run_svm_labels(train_set, test_set, train_labels):
+	print "Start running SVM..."
+	svmModel = svm.SVC()
+	svmModel.fit(train_set, train_labels)
+	print "Finished running SVM"
+
+	final_labels = svmModel.predict(test_set)
+	return final_labels
+
 # Do spectral clustering to get 10 clusters
 def runSpectralClustering(M):
 	# delta = np.std(M)
@@ -526,8 +535,7 @@ def findTrainingLabels(labels):
 	for cluster in labels:
 		train_labels.append(clusterDigitMapping[cluster])
 
-	train_labels = np.array(gmm_train_labels)
-	train_labels = np.reshape(gmm_train_labels, (6000, ))
+	train_labels = np.array(train_labels)
 
 	return train_labels
  
@@ -575,7 +583,7 @@ def checkLabelledNodes():
 # Credit: Special thanks to Ilan Filonenko for this plotting approach
 def visualizeClusters(M, clusters, title="Clustering"):
 	tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=500)
-	tsne_data = tsne.fit_transform(M)
+	tsne_data = tsne.fit_transform(np.squeeze(np.asarray(M)))
 
 	plt.title(title)
 	plt.scatter(tsne_data[:,0], tsne_data[:,1], c=clusters, cmap=plt.cm.get_cmap("jet", 10))
@@ -584,21 +592,71 @@ def visualizeClusters(M, clusters, title="Clustering"):
 	plt.colorbar()
 	plt.show()
 
+#Generate a graph for KMeans model
+def generateGraphForKMeans():
+	matrix = np.genfromtxt("../csv/se_gmm_svm_3_modified 2.csv", delimiter = ',', skip_header=1)
+	labels = np.zeros((4000, 1))
+	for i in range(matrix.shape[0]):
+		labels[i,:] = matrix[i, 1]
+
+	visualizeClusters(features[6000:, :], np.reshape(labels, (4000, )), "KMeans on Concatenated X and Y scores")
+
+#Generate the graph of the first submission that we had that was good
+def generateGraphForFirstSubmission():
+	matrix = np.genfromtxt("../csv/attempt.csv", delimiter = ',', skip_header=1)
+	labels = np.zeros((4000, 1))
+	for i in range(matrix.shape[0]):
+		labels[i,:] = matrix[i, 1]
+
+	visualizeClusters(features[6000:, :], np.reshape(labels, (4000, )), "First Model KMeans")
+
+#Generate graphs for the GMM model
+def generateGraphForGMM():
+	matrix = np.genfromtxt("../csv/se_gmm_svm 3.csv", delimiter = ',', skip_header=1)
+	labels = np.zeros((4000, 1))
+	for i in range(matrix.shape[0]):
+		labels[i,:] = matrix[i, 1]
+
+	visualizeClusters(features[6000:, :], np.reshape(labels, (4000, )), "Gaussian Mixture Model")
+
+#Generate graphs for the SVM model
+def generateGraphForSVM():
+	training_labels = []
+	nodes = []
+	for i in range(seed.shape[0]):
+		nodes.append(seed[i, 0])
+		training_labels.append(seed[i, 1])
+
+	training_labels = np.array(training_labels)
+	
+	train_set = np.zeros((60, 1084))
+	for i, n in enumerate(nodes):
+		train_set[i, :] = features[n-1, :]
+
+	training_labels_4000 = run_svm_labels(train_set, features[6000:, :], training_labels)
+	training_labels_6000 = run_svm_labels(train_set, features[:6000, :], training_labels)
+
+	visualizeClusters(features[6000:, :], np.reshape(training_labels_4000, (4000, )), "SVM on last 4000")
+	visualizeClusters(features[:6000, :], np.reshape(training_labels_6000, (6000, )), "SVM on first 6000")
+
+#Create visuals for all the different models that we ran
 def run():
+	M = getUnweightedAdjacencyMatrix()
+	writeUnweightedAdjacencyMatrixToCSV("UnweightedAdjacencyMatrix.csv", M)
 	M = loadUnweightedAdjacencyMatrix('UnweightedAdjacencyMatrix.csv')
 	predictedLabels = runSpectralClustering(M)
 
-	clusterAssignments = getClusterAssignments(predictedLabels)
-	clusterDigitMapping = getOptimalClusterLabelling(clusterAssignments)
-	validateClusters(clusterAssignments)
-
-	trainLabels = []
-	for cluster in predictedLabels:
-		trainLabels.append(clusterDigitMapping[cluster])
-
-	trainLabels = np.array(trainLabels)
+	trainLabels = findTrainingLabels(predictedLabels)
 
 	visualizeClusters(M, trainLabels, "Spectral Clustering")
+
+	generateGraphForKMeans()
+
+	generateGraphForGMM()
+
+	generateGraphForSVM()
+
+	generateGraphForFirstSubmission()
 
 def run1():
 	print "Performing Spectral Embedding"
@@ -638,3 +696,4 @@ def run1():
 if __name__ == '__main__':
 	np.set_printoptions(threshold=np.nan)
 	run()
+	run1()
